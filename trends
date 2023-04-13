@@ -1,0 +1,64 @@
+import requests
+import lxml.html
+import feedparser
+from pytrends.request import TrendReq
+
+pytrends = TrendReq(hl='en-US', tz=360)
+
+urls = {
+    'https://feeds.a.dj.com/rss/RSSMarketsMain.xml#': None,
+    'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml': None,
+    'https://www.cnbc.com/latest/': '//*[@id="SectionWithoutNative-TrendingNowBreaker-8"]/div/div/ul',
+    'http://feeds.bbci.co.uk/news/business/rss.xml': None,
+}
+
+
+
+print('Trending searches from Google')
+trending_searches = pytrends.trending_searches(pn='united_states') # trending searches in real time for United States
+print(trending_searches)
+
+for url, section_xpath in urls.items():
+    if section_xpath is not None:
+        # handle HTML sources
+        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
+        dom = lxml.html.fromstring(requests.get(url, headers=headers).content)
+        section = dom.xpath(section_xpath)
+
+        if section:
+            for link in section[0].xpath('.//a'):
+                link_url = link.attrib.get('href')
+                if link_url and link_url.startswith('https'):
+                    text = link.text_content().strip()
+                    article_dom = lxml.html.fromstring(requests.get(link_url, headers=headers).content)
+                    summary = article_dom.xpath('//meta[@name="twitter:description"]/@content')
+                    if summary:
+                        print(text)
+                        print(summary[0])
+                        print(link_url)
+                        print()
+                    else:
+                        print(text)
+                        print("Summary not found")
+                        print(link_url)
+                        print()
+        else:
+            print(f"Section not found for URL: {url}\n")
+
+    else:
+        # handle RSS sources
+        feed = feedparser.parse(url)
+        for i, entry in enumerate(feed.entries[:6]):
+            text = entry.title
+            summary = entry.summary
+            link_url = entry.link
+            if summary:
+                print(text)
+                print(summary)
+                print(link_url)
+                print()
+            else:
+                print(text)
+                print("Summary not found")
+                print(link_url)
+                print()
